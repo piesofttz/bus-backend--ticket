@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: bus_db
+      POSTGRES_USER: bus_user
+      POSTGRES_PASSWORD: bus_password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bus_user -d bus_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SECRET_KEY=change-me-in-production
+      - DJANGO_DEBUG=True
+      - DATABASE_URL=postgres://bus_user:bus_password@db:5432/bus_db
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
