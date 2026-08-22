@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Ticket
+from .models import Profile, Ticket
 
 
 class LoginSerializer(serializers.Serializer):
@@ -21,10 +21,18 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ['phone_number', 'location', 'nida_number']
+
+
 class UserSerializer(serializers.ModelSerializer):
+    profile = ProfileSerializer(read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile']
 
 
 class TicketSerializer(serializers.ModelSerializer):

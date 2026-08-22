@@ -42,31 +42,40 @@ def user_view(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_view(request):
-    username = request.data.get('username')
+    name = request.data.get('name')
     password = request.data.get('password')
     email = request.data.get('email', '')
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
+    phone_number = request.data.get('phone_number', '')
+    location = request.data.get('location', '')
+    nida_number = request.data.get('nida_number', '')
 
-    if not username or not password:
+    if not name or not password:
         return Response(
-            {'error': 'Username and password are required.'},
+            {'error': 'Name and password are required.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if User.objects.filter(username=username).exists():
+    if User.objects.filter(username=name).exists():
         return Response(
-            {'error': 'Username already exists.'},
+            {'error': 'Name already exists.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     user = User.objects.create_user(
-        username=username,
+        username=name,
         password=password,
         email=email,
         first_name=first_name,
         last_name=last_name,
     )
+
+    profile = user.profile
+    profile.phone_number = phone_number
+    profile.location = location
+    profile.nida_number = nida_number
+    profile.save()
 
     login(request, user)
     return Response({
