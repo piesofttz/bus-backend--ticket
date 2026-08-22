@@ -6,15 +6,15 @@ from .models import Ticket
 
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    name = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        username = attrs.get('username')
+        name = attrs.get('name')
         password = attrs.get('password')
-        user = authenticate(username=username, password=password)
+        user = authenticate(username=name, password=password)
         if not user:
-            raise serializers.ValidationError('Invalid username or password.')
+            raise serializers.ValidationError('Invalid name or password.')
         if not user.is_active:
             raise serializers.ValidationError('User account is disabled.')
         attrs['user'] = user
