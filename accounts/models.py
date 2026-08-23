@@ -84,6 +84,8 @@ class Booking(models.Model):
     ticket_number = models.CharField(max_length=20, unique=True, editable=False)
     full_name = models.CharField(max_length=200)
     phone_number = models.CharField(max_length=20)
+    travel_date = models.DateField(null=True, blank=True)
+    travel_time = models.TimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
     created_at = models.DateTimeField(auto_now_add=True)
 

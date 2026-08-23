@@ -80,6 +80,7 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = [
             'id', 'user', 'ticket_number', 'full_name', 'phone_number',
+            'travel_date', 'travel_time',
             'bus', 'bus_number', 'operator', 'route_display',
             'seat', 'seat_number', 'price',
             'departure_time', 'arrival_time',
