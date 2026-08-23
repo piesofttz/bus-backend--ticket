@@ -1,9 +1,13 @@
 from django.urls import path
 
 from .views import (
-    TicketDetailView,
-    TicketListCreateView,
-    TicketReceiptPDFView,
+    BookingCreateView,
+    BookingDetailView,
+    BookingListView,
+    BookingReceiptPDFView,
+    BusListView,
+    RouteListView,
+    SeatListView,
     login_view,
     logout_view,
     register_view,
@@ -15,7 +19,11 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('register/', register_view, name='register'),
     path('user/', user_view, name='user'),
-    path('tickets/', TicketListCreateView.as_view(), name='ticket-list-create'),
-    path('tickets/<int:pk>/', TicketDetailView.as_view(), name='ticket-detail'),
-    path('tickets/<int:pk>/receipt/', TicketReceiptPDFView.as_view(), name='ticket-receipt'),
+    path('routes/', RouteListView.as_view(), name='route-list'),
+    path('routes/<int:route_id>/buses/', BusListView.as_view(), name='bus-list'),
+    path('buses/<int:bus_id>/seats/', SeatListView.as_view(), name='seat-list'),
+    path('bookings/', BookingListView.as_view(), name='booking-list'),
+    path('bookings/create/', BookingCreateView.as_view(), name='booking-create'),
+    path('bookings/<int:pk>/', BookingDetailView.as_view(), name='booking-detail'),
+    path('bookings/<int:pk>/receipt/', BookingReceiptPDFView.as_view(), name='booking-receipt'),
 ]

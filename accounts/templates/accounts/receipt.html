@@ -43,6 +43,16 @@
             margin-bottom: 15px;
             letter-spacing: 2px;
         }
+        .route-box {
+            text-align: center;
+            background: #eaf2f8;
+            border: 1px solid #1a5276;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #1a5276;
+        }
         .details {
             display: flex;
             justify-content: space-between;
@@ -60,15 +70,14 @@
             font-weight: bold;
             color: #555;
         }
-        .route-box {
+        .price-box {
             text-align: center;
-            background: #eaf2f8;
-            border: 1px solid #1a5276;
-            padding: 10px;
-            margin: 15px 0;
-            font-size: 14px;
+            background: #27ae60;
+            color: #fff;
+            font-size: 18px;
             font-weight: bold;
-            color: #1a5276;
+            padding: 8px;
+            margin: 15px 0;
         }
         .footer {
             text-align: center;
@@ -87,40 +96,50 @@
             <p>Tanzania Bus Company</p>
         </div>
 
-        <div class="ticket-number">{{ ticket.ticket_number }}</div>
+        <div class="ticket-number">{{ booking.ticket_number }}</div>
 
-        <div class="route-box">{{ ticket.get_route_display }}</div>
+        <div class="route-box">{{ booking.route_display }}</div>
 
         <div class="details">
             <div class="col">
                 <div class="row">
                     <span class="label">Passenger Name:</span>
-                    <span>{{ ticket.full_name }}</span>
+                    <span>{{ booking.full_name }}</span>
                 </div>
                 <div class="row">
                     <span class="label">Phone Number:</span>
-                    <span>{{ ticket.phone_number }}</span>
+                    <span>{{ booking.phone_number }}</span>
                 </div>
                 <div class="row">
-                    <span class="label">Seat Number:</span>
-                    <span>{{ ticket.seat_number }}</span>
+                    <span class="label">Bus Number:</span>
+                    <span>{{ booking.bus_number }}</span>
+                </div>
+                <div class="row">
+                    <span class="label">Operator:</span>
+                    <span>{{ booking.operator }}</span>
                 </div>
             </div>
             <div class="col">
                 <div class="row">
-                    <span class="label">Travel Date:</span>
-                    <span>{{ ticket.travel_date }}</span>
+                    <span class="label">Seat Number:</span>
+                    <span>{{ booking.seat_number }}</span>
                 </div>
                 <div class="row">
-                    <span class="label">Booked By:</span>
-                    <span>{{ ticket.user.username }}</span>
+                    <span class="label">Departure:</span>
+                    <span>{{ booking.departure_time }}</span>
+                </div>
+                <div class="row">
+                    <span class="label">Arrival:</span>
+                    <span>{{ booking.arrival_time }}</span>
                 </div>
                 <div class="row">
                     <span class="label">Booked On:</span>
-                    <span>{{ ticket.created_at|date:"d M Y H:i" }}</span>
+                    <span>{{ booking.created_at|date:"d M Y H:i" }}</span>
                 </div>
             </div>
         </div>
+
+        <div class="price-box">TSh {{ booking.price }}</div>
 
         <div class="footer">
             Please present this receipt when boarding. Keep it safe.<br>

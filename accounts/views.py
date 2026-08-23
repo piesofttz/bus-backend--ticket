@@ -9,8 +9,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from xhtml2pdf import pisa
 
-from .models import Ticket
-from .serializers import LoginSerializer, TicketSerializer, UserSerializer
+from .models import Booking, Bus, Route, Seat
+from .serializers import (
+    BookingSerializer,
+    BusSerializer,
+    LoginSerializer,
+    RouteSerializer,
+    SeatSerializer,
+    UserSerializer,
+)
 
 
 @api_view(['POST'])
@@ -84,67 +91,122 @@ def register_view(request):
     }, status=status.HTTP_201_CREATED)
 
 
-class TicketListCreateView(APIView):
+class RouteListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        tickets = Ticket.objects.filter(user=request.user)
-        serializer = TicketSerializer(tickets, many=True)
+        search = request.query_params.get('search', '').strip()
+        routes = Route.objects.all()
+        if search:
+            routes = routes.filter(
+                origin__icontains=search
+            ) | routes.filter(
+                destination__icontains=search
+            )
+        serializer = RouteSerializer(routes, many=True)
         return Response(serializer.data)
 
+
+class BusListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, route_id):
+        try:
+            route = Route.objects.get(pk=route_id)
+        except Route.DoesNotExist:
+            return Response(
+                {'error': 'Route not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        buses = Bus.objects.filter(route=route, is_active=True)
+        serializer = BusSerializer(buses, many=True)
+        return Response(serializer.data)
+
+
+class SeatListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, bus_id):
+        try:
+            bus = Bus.objects.get(pk=bus_id)
+        except Bus.DoesNotExist:
+            return Response(
+                {'error': 'Bus not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        seats = Seat.objects.filter(bus=bus)
+        serializer = SeatSerializer(seats, many=True)
+        return Response(serializer.data)
+
+
+class BookingCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        serializer = TicketSerializer(data=request.data)
+        data = request.data.copy()
+        data['user'] = request.user.id
+        serializer = BookingSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save(user=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class TicketDetailView(APIView):
+class BookingListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        bookings = Booking.objects.filter(user=request.user)
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data)
+
+
+class BookingDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         try:
-            ticket = Ticket.objects.get(pk=pk, user=request.user)
-        except Ticket.DoesNotExist:
+            booking = Booking.objects.get(pk=pk, user=request.user)
+        except Booking.DoesNotExist:
             return Response(
-                {'error': 'Ticket not found.'},
+                {'error': 'Booking not found.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        serializer = TicketSerializer(ticket)
+        serializer = BookingSerializer(booking)
         return Response(serializer.data)
 
     def delete(self, request, pk):
         try:
-            ticket = Ticket.objects.get(pk=pk, user=request.user)
-        except Ticket.DoesNotExist:
+            booking = Booking.objects.get(pk=pk, user=request.user)
+        except Booking.DoesNotExist:
             return Response(
-                {'error': 'Ticket not found.'},
+                {'error': 'Booking not found.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        ticket.delete()
+        booking.status = 'cancelled'
+        booking.delete()
         return Response(
-            {'message': 'Ticket deleted successfully.'},
+            {'message': 'Booking cancelled successfully.'},
             status=status.HTTP_200_OK,
         )
 
 
-class TicketReceiptPDFView(APIView):
+class BookingReceiptPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         try:
-            ticket = Ticket.objects.get(pk=pk, user=request.user)
-        except Ticket.DoesNotExist:
+            booking = Booking.objects.get(pk=pk, user=request.user)
+        except Booking.DoesNotExist:
             return Response(
-                {'error': 'Ticket not found.'},
+                {'error': 'Booking not found.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        html_string = render_to_string('accounts/receipt.html', {'ticket': ticket})
+        html_string = render_to_string('accounts/receipt.html', {'booking': booking})
 
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = (
-            f'attachment; filename="receipt_{ticket.ticket_number}.pdf"'
+            f'attachment; filename="receipt_{booking.ticket_number}.pdf"'
         )
 
         pisa_status = pisa.CreatePDF(html_string, dest=response)
