@@ -1,8 +1,11 @@
 venv/
 env/
+.venv/
 __pycache__/
 *.pyc
 .env
+.env.zip
+.venv.zip
 db.sqlite3
 staticfiles/
 *.log
