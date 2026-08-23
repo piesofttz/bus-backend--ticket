@@ -2,6 +2,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template.loader import render_to_string
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -20,6 +21,13 @@ from .serializers import (
 )
 
 
+@extend_schema(
+    summary='Login',
+    description='Login with name and password',
+    request=LoginSerializer,
+    responses={200: UserSerializer},
+    tags=['Auth'],
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -33,6 +41,12 @@ def login_view(request):
     }, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    summary='Logout',
+    description='Logout current user',
+    responses={200: {'type': 'object', 'properties': {'message': {'type': 'string'}}}},
+    tags=['Auth'],
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
@@ -40,12 +54,40 @@ def logout_view(request):
     return Response({'message': 'Logout successful.'}, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    summary='Get Current User',
+    description='Get logged-in user profile',
+    responses={200: UserSerializer},
+    tags=['Auth'],
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_view(request):
     return Response(UserSerializer(request.user).data)
 
 
+@extend_schema(
+    summary='Register',
+    description='Register a new user with profile info',
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'name': {'type': 'string', 'description': 'Login name'},
+                'password': {'type': 'string', 'description': 'Password'},
+                'email': {'type': 'string', 'description': 'Email address'},
+                'first_name': {'type': 'string', 'description': 'First name'},
+                'last_name': {'type': 'string', 'description': 'Last name'},
+                'phone_number': {'type': 'string', 'description': 'Phone number'},
+                'location': {'type': 'string', 'description': 'Location/address'},
+                'nida_number': {'type': 'string', 'description': 'NIDA national ID'},
+            },
+            'required': ['name', 'password'],
+        }
+    },
+    responses={201: UserSerializer, 400: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+    tags=['Auth'],
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_view(request):
@@ -94,6 +136,15 @@ def register_view(request):
 class RouteListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Search Routes',
+        description='Search all bus routes by origin or destination. Pass ?search=mwanza to filter.',
+        parameters=[
+            OpenApiParameter(name='search', type=str, description='Search by origin or destination city'),
+        ],
+        responses={200: RouteSerializer(many=True)},
+        tags=['Routes'],
+    )
     def get(self, request):
         search = request.query_params.get('search', '').strip()
         routes = Route.objects.all()
@@ -110,6 +161,12 @@ class RouteListView(APIView):
 class BusListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Get Buses for Route',
+        description='Get all available buses for a specific route',
+        responses={200: BusSerializer(many=True), 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+        tags=['Buses'],
+    )
     def get(self, request, route_id):
         try:
             route = Route.objects.get(pk=route_id)
@@ -126,6 +183,12 @@ class BusListView(APIView):
 class SeatListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Get Seats for Bus',
+        description='Get all seats for a specific bus with availability status',
+        responses={200: SeatSerializer(many=True), 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+        tags=['Seats'],
+    )
     def get(self, request, bus_id):
         try:
             bus = Bus.objects.get(pk=bus_id)
@@ -142,6 +205,26 @@ class SeatListView(APIView):
 class BookingCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Book a Ticket',
+        description='Create a new booking. Agent provides full_name, phone_number, bus ID, seat ID, travel_date, travel_time. Ticket number is auto-generated.',
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'full_name': {'type': 'string', 'description': 'Client full name'},
+                    'phone_number': {'type': 'string', 'description': 'Client phone number'},
+                    'bus': {'type': 'integer', 'description': 'Bus ID'},
+                    'seat': {'type': 'integer', 'description': 'Seat ID'},
+                    'travel_date': {'type': 'string', 'format': 'date', 'description': 'Travel date (YYYY-MM-DD)'},
+                    'travel_time': {'type': 'string', 'format': 'time', 'description': 'Travel time (HH:MM)'},
+                },
+                'required': ['full_name', 'phone_number', 'bus', 'seat', 'travel_date', 'travel_time'],
+            }
+        },
+        responses={201: BookingSerializer, 400: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+        tags=['Bookings'],
+    )
     def post(self, request):
         data = request.data.copy()
         data['user'] = request.user.id
@@ -154,6 +237,12 @@ class BookingCreateView(APIView):
 class BookingListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='List My Bookings',
+        description='Get all bookings made by the current user',
+        responses={200: BookingSerializer(many=True)},
+        tags=['Bookings'],
+    )
     def get(self, request):
         bookings = Booking.objects.filter(user=request.user)
         serializer = BookingSerializer(bookings, many=True)
@@ -163,6 +252,12 @@ class BookingListView(APIView):
 class BookingDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Get Booking Detail',
+        description='Get a single booking by ID',
+        responses={200: BookingSerializer, 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+        tags=['Bookings'],
+    )
     def get(self, request, pk):
         try:
             booking = Booking.objects.get(pk=pk, user=request.user)
@@ -174,6 +269,12 @@ class BookingDetailView(APIView):
         serializer = BookingSerializer(booking)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary='Cancel Booking',
+        description='Cancel/delete a booking and free the seat',
+        responses={200: {'type': 'object', 'properties': {'message': {'type': 'string'}}}, 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+        tags=['Bookings'],
+    )
     def delete(self, request, pk):
         try:
             booking = Booking.objects.get(pk=pk, user=request.user)
@@ -193,6 +294,12 @@ class BookingDetailView(APIView):
 class BookingReceiptPDFView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Download PDF Receipt',
+        description='Download a PDF receipt for a booking',
+        responses={200: {'description': 'PDF file'}, 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+        tags=['Bookings'],
+    )
     def get(self, request, pk):
         try:
             booking = Booking.objects.get(pk=pk, user=request.user)
