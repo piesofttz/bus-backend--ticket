@@ -6,15 +6,15 @@ from .models import Booking, Bus, Profile, Route, Seat
 
 
 class LoginSerializer(serializers.Serializer):
-    name = serializers.CharField()
+    username = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        name = attrs.get('name')
+        username = attrs.get('username')
         password = attrs.get('password')
-        user = authenticate(username=name, password=password)
+        user = authenticate(username=username, password=password)
         if not user:
-            raise serializers.ValidationError('Invalid name or password.')
+            raise serializers.ValidationError('Invalid username or password.')
         if not user.is_active:
             raise serializers.ValidationError('User account is disabled.')
         attrs['user'] = user

@@ -23,7 +23,7 @@ from .serializers import (
 
 @extend_schema(
     summary='Login',
-    description='Login with name and password',
+    description='Login with username and password',
     request=LoginSerializer,
     responses={200: UserSerializer},
     tags=['Auth'],
@@ -73,7 +73,7 @@ def user_view(request):
         'application/json': {
             'type': 'object',
             'properties': {
-                'name': {'type': 'string', 'description': 'Login name'},
+                'username': {'type': 'string', 'description': 'Login username'},
                 'password': {'type': 'string', 'description': 'Password'},
                 'email': {'type': 'string', 'description': 'Email address'},
                 'first_name': {'type': 'string', 'description': 'First name'},
@@ -82,7 +82,7 @@ def user_view(request):
                 'location': {'type': 'string', 'description': 'Location/address'},
                 'nida_number': {'type': 'string', 'description': 'NIDA national ID'},
             },
-            'required': ['name', 'password'],
+            'required': ['username', 'password'],
         }
     },
     responses={201: UserSerializer, 400: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
@@ -91,7 +91,7 @@ def user_view(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_view(request):
-    name = request.data.get('name')
+    username = request.data.get('username')
     password = request.data.get('password')
     email = request.data.get('email', '')
     first_name = request.data.get('first_name', '')
@@ -100,20 +100,20 @@ def register_view(request):
     location = request.data.get('location', '')
     nida_number = request.data.get('nida_number', '')
 
-    if not name or not password:
+    if not username or not password:
         return Response(
-            {'error': 'Name and password are required.'},
+            {'error': 'Username and password are required.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if User.objects.filter(username=name).exists():
+    if User.objects.filter(username=username).exists():
         return Response(
-            {'error': 'Name already exists.'},
+            {'error': 'Username already exists.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     user = User.objects.create_user(
-        username=name,
+        username=username,
         password=password,
         email=email,
         first_name=first_name,
