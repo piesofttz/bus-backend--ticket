@@ -4,6 +4,7 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -23,9 +24,13 @@ from .serializers import (
 
 @extend_schema(
     summary='Login',
-    description='Login with username and password',
+    description='Login with username and password. Returns an access token.',
     request=LoginSerializer,
-    responses={200: UserSerializer},
+    responses={200: {'type': 'object', 'properties': {
+        'access_token': {'type': 'string', 'description': 'Token to use in Authorization header'},
+        'user': {'$ref': '#/components/schemas/User'},
+        'message': {'type': 'string'},
+    }}},
     tags=['Auth'],
 )
 @api_view(['POST'])
@@ -35,7 +40,9 @@ def login_view(request):
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
     login(request, user)
+    token, created = Token.objects.get_or_create(user=user)
     return Response({
+        'access_token': token.key,
         'user': UserSerializer(user).data,
         'message': 'Login successful.',
     }, status=status.HTTP_200_OK)
@@ -43,13 +50,14 @@ def login_view(request):
 
 @extend_schema(
     summary='Logout',
-    description='Logout current user',
+    description='Logout and destroy the access token',
     responses={200: {'type': 'object', 'properties': {'message': {'type': 'string'}}}},
     tags=['Auth'],
 )
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
+    request.user.auth_token.delete()
     logout(request)
     return Response({'message': 'Logout successful.'}, status=status.HTTP_200_OK)
 
@@ -127,7 +135,9 @@ def register_view(request):
     profile.save()
 
     login(request, user)
+    token, created = Token.objects.get_or_create(user=user)
     return Response({
+        'access_token': token.key,
         'user': UserSerializer(user).data,
         'message': 'Registration successful.',
     }, status=status.HTTP_201_CREATED)
