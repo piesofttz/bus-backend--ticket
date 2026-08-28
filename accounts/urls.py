@@ -1,4 +1,5 @@
 from django.urls import path
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     BookingCreateView,
@@ -19,6 +20,7 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('register/', register_view, name='register'),
     path('user/', user_view, name='user'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('routes/', RouteListView.as_view(), name='route-list'),
     path('routes/<int:route_id>/buses/', BusListView.as_view(), name='bus-list'),
     path('buses/<int:bus_id>/seats/', SeatListView.as_view(), name='seat-list'),

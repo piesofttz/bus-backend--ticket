@@ -4,11 +4,11 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 from xhtml2pdf import pisa
 
 from .models import Booking, Bus, Route, Seat
@@ -24,10 +24,11 @@ from .serializers import (
 
 @extend_schema(
     summary='Login',
-    description='Login with username and password. Returns an access token.',
+    description='Login with username and password. Returns JWT access + refresh tokens.',
     request=LoginSerializer,
     responses={200: {'type': 'object', 'properties': {
-        'access_token': {'type': 'string', 'description': 'Token to use in Authorization header'},
+        'access_token': {'type': 'string', 'description': 'Access token (expires in 3 minutes)'},
+        'refresh_token': {'type': 'string', 'description': 'Refresh token (expires in 7 days)'},
         'user': {'$ref': '#/components/schemas/User'},
         'message': {'type': 'string'},
     }}},
@@ -40,9 +41,10 @@ def login_view(request):
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
     login(request, user)
-    token, created = Token.objects.get_or_create(user=user)
+    refresh = RefreshToken.for_user(user)
     return Response({
-        'access_token': token.key,
+        'access_token': str(refresh.access_token),
+        'refresh_token': str(refresh),
         'user': UserSerializer(user).data,
         'message': 'Login successful.',
     }, status=status.HTTP_200_OK)
@@ -50,14 +52,28 @@ def login_view(request):
 
 @extend_schema(
     summary='Logout',
-    description='Logout and destroy the access token',
+    description='Blacklist the refresh token so the user must login again to get new tokens.',
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'refresh_token': {'type': 'string', 'description': 'The refresh token to blacklist'},
+            },
+            'required': ['refresh_token'],
+        }
+    },
     responses={200: {'type': 'object', 'properties': {'message': {'type': 'string'}}}},
     tags=['Auth'],
 )
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    request.user.auth_token.delete()
+    try:
+        refresh_token = request.data.get('refresh_token')
+        token = RefreshToken(refresh_token)
+        token.blacklist()
+    except Exception:
+        pass
     logout(request)
     return Response({'message': 'Logout successful.'}, status=status.HTTP_200_OK)
 
@@ -135,9 +151,10 @@ def register_view(request):
     profile.save()
 
     login(request, user)
-    token, created = Token.objects.get_or_create(user=user)
+    refresh = RefreshToken.for_user(user)
     return Response({
-        'access_token': token.key,
+        'access_token': str(refresh.access_token),
+        'refresh_token': str(refresh),
         'user': UserSerializer(user).data,
         'message': 'Registration successful.',
     }, status=status.HTTP_201_CREATED)
