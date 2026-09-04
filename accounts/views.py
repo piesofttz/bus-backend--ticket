@@ -185,6 +185,45 @@ class RouteListView(APIView):
         return Response(serializer.data)
 
 
+class AllBusListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Get All Buses',
+        description='Get all available buses. Optional filters: route_id, search, origin, destination.',
+        parameters=[
+            OpenApiParameter(name='route_id', type=int, description='Filter by route ID', required=False),
+            OpenApiParameter(name='search', type=str, description='Search by bus number or operator', required=False),
+            OpenApiParameter(name='origin', type=str, description='Filter by origin city', required=False),
+            OpenApiParameter(name='destination', type=str, description='Filter by destination city', required=False),
+        ],
+        responses={200: BusSerializer(many=True)},
+        tags=['Buses'],
+    )
+    def get(self, request):
+        buses = Bus.objects.filter(is_active=True)
+        route_id = request.query_params.get('route_id')
+        search = request.query_params.get('search', '').strip()
+        origin = request.query_params.get('origin', '').strip()
+        destination = request.query_params.get('destination', '').strip()
+
+        if route_id:
+            buses = buses.filter(route_id=route_id)
+        if search:
+            buses = buses.filter(
+                bus_number__icontains=search
+            ) | buses.filter(
+                operator__icontains=search
+            )
+        if origin:
+            buses = buses.filter(route__origin__icontains=origin)
+        if destination:
+            buses = buses.filter(route__destination__icontains=destination)
+
+        serializer = BusSerializer(buses, many=True)
+        return Response(serializer.data)
+
+
 class BusListView(APIView):
     permission_classes = [IsAuthenticated]
 

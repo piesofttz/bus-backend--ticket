@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
+    AllBusListView,
     BookingCreateView,
     BookingDetailView,
     BookingListView,
@@ -22,6 +23,7 @@ urlpatterns = [
     path('user/', user_view, name='user'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('routes/', RouteListView.as_view(), name='route-list'),
+    path('buses/', AllBusListView.as_view(), name='all-bus-list'),
     path('routes/<int:route_id>/buses/', BusListView.as_view(), name='bus-list'),
     path('buses/<int:bus_id>/seats/', SeatListView.as_view(), name='seat-list'),
     path('bookings/', BookingListView.as_view(), name='booking-list'),
