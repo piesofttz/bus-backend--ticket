@@ -84,10 +84,10 @@ class BookingSerializer(serializers.ModelSerializer):
             'bus', 'bus_number', 'operator', 'route_display',
             'seat', 'seat_number', 'price',
             'departure_time', 'arrival_time',
-            'status', 'created_at',
+            'status', 'checked_in_at', 'created_at',
         ]
         read_only_fields = [
-            'id', 'user', 'ticket_number', 'status', 'created_at',
+            'id', 'user', 'ticket_number', 'status', 'checked_in_at', 'created_at',
         ]
 
     def validate(self, attrs):

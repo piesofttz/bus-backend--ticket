@@ -76,7 +76,9 @@ class Seat(models.Model):
 
 class Booking(models.Model):
     STATUS_CHOICES = [
+        ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
+        ('checked_in', 'Checked In'),
         ('cancelled', 'Cancelled'),
     ]
 
@@ -89,6 +91,7 @@ class Booking(models.Model):
     travel_date = models.DateField(null=True, blank=True)
     travel_time = models.TimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
+    checked_in_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

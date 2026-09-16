@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
     'accounts',
+    'admin_panel',
 ]
 
 MIDDLEWARE = [

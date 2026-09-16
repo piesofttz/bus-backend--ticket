@@ -42,6 +42,12 @@ def login_view(request):
     user = serializer.validated_data['user']
     login(request, user)
     refresh = RefreshToken.for_user(user)
+    if user.is_staff or user.is_superuser:
+        try:
+            from admin_panel.utils import log_admin_action
+            log_admin_action(user, 'login', 'Admin logged in', request)
+        except Exception:
+            pass
     return Response({
         'access_token': str(refresh.access_token),
         'refresh_token': str(refresh),
