@@ -88,7 +88,6 @@ class AdminBookingEditSerializer(serializers.ModelSerializer):
 
 class AdminPassengerSerializer(serializers.ModelSerializer):
     total_bookings = serializers.SerializerMethodField()
-    date_joined = serializers.DateTimeField(source='date_joined', read_only=True)
 
     class Meta:
         model = User
@@ -97,7 +96,7 @@ class AdminPassengerSerializer(serializers.ModelSerializer):
             'is_staff', 'is_active', 'date_joined', 'total_bookings',
         ]
 
-    def get_total_bookings(self, obj):
+    def get_total_bookings(self, obj) -> int:
         return obj.bookings.count()
 
     def to_representation(self, instance):
@@ -180,10 +179,10 @@ class AdminBusSerializer(serializers.ModelSerializer):
             'is_active', 'available_seats', 'total_seat_count',
         ]
 
-    def get_available_seats(self, obj):
+    def get_available_seats(self, obj) -> int:
         return obj.seats.filter(is_available=True).count()
 
-    def get_total_seat_count(self, obj):
+    def get_total_seat_count(self, obj) -> int:
         return obj.seats.count()
 
 

@@ -301,6 +301,7 @@ class AdminBookingConfirmView(AdminBookingStatusMixin, APIView):
     @extend_schema(
         summary='Confirm Booking',
         description='Mark a booking as confirmed.',
+        request=None,
         responses={200: AdminBookingSerializer, 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
         tags=['Admin Bookings'],
     )
@@ -318,6 +319,7 @@ class AdminBookingCheckInView(AdminBookingStatusMixin, APIView):
     @extend_schema(
         summary='Check-in Booking',
         description='Mark a booking as checked-in (passenger boarded). Records checked_in_at timestamp.',
+        request=None,
         responses={200: AdminBookingSerializer, 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
         tags=['Admin Bookings'],
     )
@@ -337,6 +339,7 @@ class AdminBookingCancelView(AdminBookingStatusMixin, APIView):
     @extend_schema(
         summary='Cancel Booking',
         description='Cancel a booking and free its seat.',
+        request=None,
         responses={200: AdminBookingSerializer, 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
         tags=['Admin Bookings'],
     )

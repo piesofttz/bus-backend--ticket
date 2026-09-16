@@ -59,7 +59,7 @@ class BusSerializer(serializers.ModelSerializer):
             'is_active', 'available_seats',
         ]
 
-    def get_available_seats(self, obj):
+    def get_available_seats(self, obj) -> int:
         return obj.seats.filter(is_available=True).count()
 
 
