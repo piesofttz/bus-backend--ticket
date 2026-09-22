@@ -1,20 +1,27 @@
-from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Booking, Bus, Profile, Route, Seat
+from .utils import normalize_phone_number
 
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+    phone_number = serializers.CharField()
 
     def validate(self, attrs):
-        username = attrs.get('username')
-        password = attrs.get('password')
-        user = authenticate(username=username, password=password)
-        if not user:
-            raise serializers.ValidationError('Invalid username or password.')
+        phone_number = attrs.get('phone_number')
+        normalized = normalize_phone_number(phone_number)
+        if not normalized:
+            raise serializers.ValidationError(
+                'Invalid phone number. Use the 9 digits after +255, e.g. 674303431.'
+            )
+
+        try:
+            profile = Profile.objects.get(phone_number=normalized)
+        except Profile.DoesNotExist:
+            raise serializers.ValidationError('This phone number is not registered.')
+
+        user = profile.user
         if not user.is_active:
             raise serializers.ValidationError('User account is disabled.')
         attrs['user'] = user

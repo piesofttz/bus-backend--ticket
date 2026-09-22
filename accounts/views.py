@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from xhtml2pdf import pisa
 
-from .models import Booking, Bus, Route, Seat
+from .models import Booking, Bus, Profile, Route, Seat
 from .serializers import (
     BookingSerializer,
     BusSerializer,
@@ -20,11 +20,12 @@ from .serializers import (
     SeatSerializer,
     UserSerializer,
 )
+from .utils import normalize_phone_number
 
 
 @extend_schema(
     summary='Login',
-    description='Login with username and password. Returns JWT access + refresh tokens.',
+    description='Login with a registered phone number. Enter the 9 digits after +255 (e.g. 674303431). Returns JWT access + refresh tokens.',
     request=LoginSerializer,
     responses={200: {'type': 'object', 'properties': {
         'access_token': {'type': 'string', 'description': 'Access token (expires in 3 minutes)'},
@@ -98,21 +99,20 @@ def user_view(request):
 
 @extend_schema(
     summary='Register',
-    description='Register a new user with profile info',
+    description='Register a new user. Phone number is required (9 digits after +255, e.g. 674303431) and is used for login. A username is auto-generated.',
     request={
         'application/json': {
             'type': 'object',
             'properties': {
-                'username': {'type': 'string', 'description': 'Login username'},
-                'password': {'type': 'string', 'description': 'Password'},
+                'phone_number': {'type': 'string', 'description': 'Phone number (9 digits after +255), e.g. 674303431'},
+                'password': {'type': 'string', 'description': 'Optional password (defaults to phone number)'},
                 'email': {'type': 'string', 'description': 'Email address'},
                 'first_name': {'type': 'string', 'description': 'First name'},
                 'last_name': {'type': 'string', 'description': 'Last name'},
-                'phone_number': {'type': 'string', 'description': 'Phone number'},
                 'location': {'type': 'string', 'description': 'Location/address'},
                 'nida_number': {'type': 'string', 'description': 'NIDA national ID'},
             },
-            'required': ['username', 'password'],
+            'required': ['phone_number'],
         }
     },
     responses={201: UserSerializer, 400: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
@@ -121,26 +121,29 @@ def user_view(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_view(request):
-    username = request.data.get('username')
-    password = request.data.get('password')
+    phone_number = request.data.get('phone_number', '')
+    password = request.data.get('password') or phone_number
     email = request.data.get('email', '')
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
-    phone_number = request.data.get('phone_number', '')
     location = request.data.get('location', '')
     nida_number = request.data.get('nida_number', '')
 
-    if not username or not password:
+    normalized = normalize_phone_number(phone_number)
+    if not normalized:
         return Response(
-            {'error': 'Username and password are required.'},
+            {'error': 'Invalid phone number. Enter the 9 digits after +255, e.g. 674303431.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if User.objects.filter(username=username).exists():
+    if Profile.objects.filter(phone_number=normalized).exists():
         return Response(
-            {'error': 'Username already exists.'},
+            {'error': 'This phone number is already registered.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    username = 'user_' + normalized[-9:]
+    username = username[:150]
 
     user = User.objects.create_user(
         username=username,
@@ -151,7 +154,7 @@ def register_view(request):
     )
 
     profile = user.profile
-    profile.phone_number = phone_number
+    profile.phone_number = normalized
     profile.location = location
     profile.nida_number = nida_number
     profile.save()

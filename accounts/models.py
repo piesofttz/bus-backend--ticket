@@ -9,12 +9,12 @@ from django.dispatch import receiver
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    phone_number = models.CharField(max_length=20, blank=True, default='')
+    phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True, default=None)
     location = models.CharField(max_length=200, blank=True, default='')
     nida_number = models.CharField(max_length=50, blank=True, default='')
 
     def __str__(self):
-        return f"Profile of {self.user.username}"
+        return f"Profile of {self.user.username} ({self.phone_number})"
 
 
 @receiver(post_save, sender=User)
