@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Profile
+from .models import Bus, Profile, Route, Seat
 from .utils import normalize_phone_number
 
 
@@ -114,3 +114,21 @@ class RegisterTests(TestCase):
             'phone_number': '12',
         }, format='json')
         self.assertEqual(resp.status_code, 400)
+
+
+class SeatOrderingTests(TestCase):
+    def test_seats_ordered_chronologically(self):
+        route = Route.objects.create(
+            origin='Mwanza', destination='Dar es Salaam',
+            price=35000, duration_hours=10, duration_minutes=0,
+        )
+        bus = Bus.objects.create(
+            route=route, bus_number='BUS-TEST', operator='Test Coach',
+            total_seats=53, departure_time='06:00', arrival_time='16:00',
+        )
+        for i in range(1, 54):
+            Seat.objects.create(bus=bus, seat_number=str(i), position=i)
+
+        seats = list(Seat.objects.filter(bus=bus))
+        self.assertEqual(len(seats), 53)
+        self.assertEqual([s.seat_number for s in seats], [str(n) for n in range(1, 54)])

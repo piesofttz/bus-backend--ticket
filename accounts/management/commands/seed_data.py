@@ -58,7 +58,7 @@ class Command(BaseCommand):
             )
             if created:
                 for s in range(1, seats_count + 1):
-                    Seat.objects.create(bus=bus, seat_number=str(s))
+                    Seat.objects.create(bus=bus, seat_number=str(s), position=s)
 
         self.stdout.write(self.style.SUCCESS(
             f'Done! {Route.objects.count()} routes, '

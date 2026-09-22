@@ -64,11 +64,12 @@ class Bus(models.Model):
 class Seat(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='seats')
     seat_number = models.CharField(max_length=10)
+    position = models.PositiveIntegerField(default=0)
     is_available = models.BooleanField(default=True)
 
     class Meta:
         unique_together = ['bus', 'seat_number']
-        ordering = ['seat_number']
+        ordering = ['position', 'id']
 
     def __str__(self):
         return f"{self.bus.bus_number} - Seat {self.seat_number}"

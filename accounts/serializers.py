@@ -51,7 +51,7 @@ class RouteSerializer(serializers.ModelSerializer):
 class SeatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Seat
-        fields = ['id', 'seat_number', 'is_available']
+        fields = ['id', 'seat_number', 'position', 'is_available']
 
 
 class BusSerializer(serializers.ModelSerializer):

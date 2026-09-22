@@ -1,5 +1,6 @@
 from django.contrib.auth import login
 from django.contrib.auth.models import User
+from django.db import models
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
@@ -531,7 +532,11 @@ class AdminBusListView(APIView):
         create_seats = request.data.get('create_seats', False)
         if create_seats:
             for i in range(1, bus.total_seats + 1):
-                Seat.objects.get_or_create(bus=bus, seat_number=str(i), defaults={'is_available': True})
+                Seat.objects.get_or_create(
+                    bus=bus,
+                    seat_number=str(i),
+                    defaults={'is_available': True, 'position': i},
+                )
         log_admin_action(request.user, 'create', f'Created bus {bus.bus_number}', request)
         return Response(AdminBusSerializer(bus).data, status=status.HTTP_201_CREATED)
 
@@ -610,11 +615,13 @@ class AdminBusSeatCreateView(APIView):
         serializer = AdminSeatCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         created = []
+        next_position = bus.seats.aggregate(models.Max('position'))['position__max'] or 0
         for seat_number in serializer.validated_data['seat_numbers']:
+            next_position += 1
             seat, was_created = Seat.objects.get_or_create(
                 bus=bus,
                 seat_number=seat_number,
-                defaults={'is_available': serializer.validated_data['is_available']},
+                defaults={'is_available': serializer.validated_data['is_available'], 'position': next_position},
             )
             created.append({'seat_number': seat.seat_number, 'created': was_created})
         bus.total_seats = bus.seats.count()
