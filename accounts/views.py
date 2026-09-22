@@ -99,13 +99,15 @@ def user_view(request):
 
 @extend_schema(
     summary='Register',
-    description='Register a new user. Phone number is required (9 digits after +255, e.g. 674303431) and is used for login. A username is auto-generated.',
+    description=(
+        'Register a new user. Phone number is required (9 digits after +255, e.g. 674303431) '
+        'and is used for login. No password is needed. A username is auto-generated.'
+    ),
     request={
         'application/json': {
             'type': 'object',
             'properties': {
                 'phone_number': {'type': 'string', 'description': 'Phone number (9 digits after +255), e.g. 674303431'},
-                'password': {'type': 'string', 'description': 'Optional password (defaults to phone number)'},
                 'email': {'type': 'string', 'description': 'Email address'},
                 'first_name': {'type': 'string', 'description': 'First name'},
                 'last_name': {'type': 'string', 'description': 'Last name'},
@@ -122,7 +124,6 @@ def user_view(request):
 @permission_classes([AllowAny])
 def register_view(request):
     phone_number = request.data.get('phone_number', '')
-    password = request.data.get('password') or phone_number
     email = request.data.get('email', '')
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
@@ -147,7 +148,7 @@ def register_view(request):
 
     user = User.objects.create_user(
         username=username,
-        password=password,
+        password=None,
         email=email,
         first_name=first_name,
         last_name=last_name,

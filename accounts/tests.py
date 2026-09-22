@@ -81,6 +81,22 @@ class RegisterTests(TestCase):
             Profile.objects.filter(phone_number='+255754234512').exists()
         )
 
+    def test_register_requested_payload(self):
+        resp = self.client.post('/api/auth/register/', {
+            'phone_number': '674303431',
+            'email': 'user@example.com',
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'location': 'Dar es Salaam',
+            'nida_number': '19920101-12345-00123',
+        }, format='json')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['user']['first_name'], 'John')
+        self.assertEqual(resp.data['user']['last_name'], 'Doe')
+        profile = Profile.objects.get(phone_number='+255674303431')
+        self.assertEqual(profile.location, 'Dar es Salaam')
+        self.assertEqual(profile.nida_number, '19920101-12345-00123')
+
     def test_register_duplicate_phone(self):
         user = User.objects.create_user(username='user_754234512', password='p')
         profile = user.profile
