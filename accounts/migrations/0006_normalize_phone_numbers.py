@@ -5,14 +5,20 @@ from accounts.utils import normalize_phone_number
 
 def normalize_existing_phones(apps, schema_editor):
     Profile = apps.get_model('accounts', 'Profile')
-    for profile in Profile.objects.all():
+    seen = set()
+    for profile in Profile.objects.all().order_by('id'):
         if not profile.phone_number:
             continue
         normalized = normalize_phone_number(profile.phone_number)
-        if normalized:
-            if not Profile.objects.filter(phone_number=normalized).exclude(pk=profile.pk).exists():
-                profile.phone_number = normalized
-                profile.save()
+        if normalized and normalized not in seen:
+            profile.phone_number = normalized
+            profile.save()
+            seen.add(normalized)
+        elif normalized:
+            # Duplicate number after normalization: keep the first account,
+            # clear the phone on later duplicates so the unique index can be created.
+            profile.phone_number = None
+            profile.save()
 
 
 class Migration(migrations.Migration):
