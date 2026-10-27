@@ -12,6 +12,7 @@ from .views import (
     SeatListView,
     login_view,
     logout_view,
+    payment_callback_view,
     register_view,
     user_view,
 )

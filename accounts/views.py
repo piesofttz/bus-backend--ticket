@@ -399,3 +399,65 @@ class BookingReceiptPDFView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         return response
+
+
+@extend_schema(
+    summary='Payment Callback',
+    description='Provider confirms payment; booking becomes confirmed. Accepts callback from payment provider (e.g. mpesa) and marks the associated booking as confirmed.',
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'booking_id': {'type': 'integer', 'description': 'Booking ID'},
+                'ticket_number': {'type': 'string', 'description': 'Booking ticket number'},
+                'status': {'type': 'string', 'description': 'Provider payment status (e.g. success/completed)'},
+                'transaction_id': {'type': 'string', 'description': 'Provider transaction/reference ID'},
+                'amount': {'type': 'number', 'description': 'Paid amount'},
+                'phone_number': {'type': 'string', 'description': 'Payer phone number'},
+            },
+        }
+    },
+    responses={
+        200: {'type': 'object', 'properties': {
+            'message': {'type': 'string'},
+            'booking_id': {'type': 'integer'},
+            'ticket_number': {'type': 'string'},
+            'status': {'type': 'string'},
+        }},
+        400: {'type': 'object', 'properties': {'error': {'type': 'string'}}},
+        404: {'type': 'object', 'properties': {'error': {'type': 'string'}}},
+    },
+    tags=['Payments'],
+)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def payment_callback_view(request, provider):
+    data = request.data or {}
+    booking_id = data.get('booking_id')
+    ticket_number = data.get('ticket_number')
+
+    booking = None
+    if booking_id:
+        booking = Booking.objects.filter(pk=booking_id).first()
+    if not booking and ticket_number:
+        booking = Booking.objects.filter(ticket_number=ticket_number).first()
+
+    if not booking:
+        return Response(
+            {'error': 'Booking not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Provider confirms payment; booking becomes confirmed
+    if booking.status != 'confirmed':
+        booking.status = 'confirmed'
+        booking.save(update_fields=['status'])
+    else:
+        booking.save(update_fields=[])
+
+    return Response({
+        'message': 'Payment confirmed. Booking is confirmed.',
+        'booking_id': booking.id,
+        'ticket_number': booking.ticket_number,
+        'status': booking.status,
+    }, status=status.HTTP_200_OK)
