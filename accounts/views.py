@@ -1,7 +1,13 @@
+import random
+from datetime import timedelta
+
+import requests
+from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template.loader import render_to_string
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -11,11 +17,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from xhtml2pdf import pisa
 
-from .models import Booking, Bus, Profile, Route, Seat
+from .models import Booking, Bus, OTP, Profile, Route, Seat
 from .serializers import (
     BookingSerializer,
     BusSerializer,
     LoginSerializer,
+    OTPRequestSerializer,
+    OTPVerifySerializer,
     RouteSerializer,
     SeatSerializer,
     UserSerializer,
@@ -95,6 +103,157 @@ def logout_view(request):
 @permission_classes([IsAuthenticated])
 def user_view(request):
     return Response(UserSerializer(request.user).data)
+
+
+def _send_otp_sms(phone_number, code):
+    """Send OTP via configured SMS API. Fill settings/env later if needed."""
+    sms_url = getattr(settings, 'SMS_API_URL', '') or ''
+    sms_user = getattr(settings, 'SMS_USER', '') or ''
+    sms_pwd = getattr(settings, 'SMS_PWD', '') or ''
+    sms_sender = getattr(settings, 'SMS_SENDER', '') or ''
+    sms_language = getattr(settings, 'SMS_LANGUAGE', 'English') or 'English'
+
+    # Prepare number for provider (use normalized +255XXXXXXXXX by default; adjust if provider expects different format)
+    number = phone_number
+    msg = f'Your login OTP is {code}. Do not share it with anyone.'
+
+    payload = [{
+        'user': sms_user,
+        'pwd': sms_pwd,
+        'number': number,
+        'msg': msg,
+        'sender': sms_sender,
+        'language': sms_language,
+    }]
+
+    # If API URL not configured, log/skip sending but still allow flow for testing? Return False so we know it failed to send
+    if not sms_url:
+        # TODO: SMS_API_URL not configured
+        return False
+
+    try:
+        # Try JSON POST
+        resp = requests.post(sms_url, json=payload, timeout=30)
+        try:
+            resp.raise_for_status()
+        except Exception:
+            pass
+        # Try to parse response; don't fail hard
+        return resp.ok
+    except Exception:
+        return False
+
+
+@extend_schema(
+    summary='Request OTP (Phone Login)',
+    description='Request an OTP sent to the registered phone number. Enter phone number (9 digits after +255 or full number).',
+    request=OTPRequestSerializer,
+    responses={
+        200: {'type': 'object', 'properties': {
+            'message': {'type': 'string'},
+            'phone_number': {'type': 'string'},
+            'expires_in_minutes': {'type': 'integer'},
+        }},
+        400: {'type': 'object', 'properties': {'error': {'type': 'string'}}},
+    },
+    tags=['Auth'],
+)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def otp_request_view(request):
+    serializer = OTPRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    phone_number = serializer.validated_data['phone_number']
+    user = serializer.validated_data['user']
+
+    # Invalidate previous unused OTPs for this number
+    OTP.objects.filter(phone_number=phone_number, is_used=False).update(is_used=True)
+
+    otp_length = getattr(settings, 'OTP_LENGTH', 6)
+    code = ''.join([str(random.randint(0, 9)) for _ in range(int(otp_length))])
+    expires_at = timezone.now() + timedelta(minutes=int(getattr(settings, 'OTP_EXPIRY_MINUTES', 5)))
+
+    otp = OTP.objects.create(phone_number=phone_number, code=code, expires_at=expires_at)
+
+    _send_otp_sms(phone_number, code)
+
+    return Response({
+        'message': 'OTP sent to your phone number.',
+        'phone_number': phone_number,
+        'expires_in_minutes': int(getattr(settings, 'OTP_EXPIRY_MINUTES', 5)),
+    }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary='Verify OTP (Phone Login)',
+    description='Verify OTP and login. Returns JWT access + refresh tokens on success.',
+    request=OTPVerifySerializer,
+    responses={
+        200: {'type': 'object', 'properties': {
+            'access_token': {'type': 'string'},
+            'refresh_token': {'type': 'string'},
+            'user': {'$ref': '#/components/schemas/User'},
+            'message': {'type': 'string'},
+        }},
+        400: {'type': 'object', 'properties': {'error': {'type': 'string'}}},
+    },
+    tags=['Auth'],
+)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def otp_verify_view(request):
+    serializer = OTPVerifySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    phone_number = serializer.validated_data['phone_number']
+    code = serializer.validated_data['code']
+
+    try:
+        profile = Profile.objects.get(phone_number=phone_number)
+    except Profile.DoesNotExist:
+        return Response({'error': 'This phone number is not registered.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = profile.user
+    if not user.is_active:
+        return Response({'error': 'User account is disabled.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    otp = OTP.objects.filter(phone_number=phone_number, is_used=False).order_by('-created_at').first()
+    if not otp:
+        return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if timezone.now() > otp.expires_at:
+        otp.is_used = True
+        otp.save(update_fields=['is_used'])
+        return Response({'error': 'OTP has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    max_attempts = int(getattr(settings, 'OTP_MAX_ATTEMPTS', 3))
+    if otp.attempts >= max_attempts:
+        otp.is_used = True
+        otp.save(update_fields=['is_used', 'attempts'])
+        return Response({'error': 'Too many failed attempts. Request a new OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if otp.code != code:
+        otp.attempts += 1
+        otp.save(update_fields=['attempts'])
+        return Response({'error': 'Invalid OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    otp.is_used = True
+    otp.save(update_fields=['is_used'])
+
+    login(request, user)
+    if user.is_staff or user.is_superuser:
+        try:
+            from admin_panel.utils import log_admin_action
+            log_admin_action(user, 'login', 'Admin logged in via OTP', request)
+        except Exception:
+            pass
+
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'access_token': str(refresh.access_token),
+        'refresh_token': str(refresh),
+        'user': UserSerializer(user).data,
+        'message': 'Login successful.',
+    }, status=status.HTTP_200_OK)
 
 
 @extend_schema(

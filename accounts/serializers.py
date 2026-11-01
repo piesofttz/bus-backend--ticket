@@ -28,6 +28,44 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
+class OTPRequestSerializer(serializers.Serializer):
+    phone_number = serializers.CharField()
+
+    def validate(self, attrs):
+        phone_number = attrs.get('phone_number')
+        normalized = normalize_phone_number(phone_number)
+        if not normalized:
+            raise serializers.ValidationError(
+                'Invalid phone number. Use the 9 digits after +255, e.g. 674303431.'
+            )
+
+        try:
+            profile = Profile.objects.get(phone_number=normalized)
+        except Profile.DoesNotExist:
+            raise serializers.ValidationError('This phone number is not registered.')
+
+        attrs['phone_number'] = normalized
+        attrs['user'] = profile.user
+        return attrs
+
+
+class OTPVerifySerializer(serializers.Serializer):
+    phone_number = serializers.CharField()
+    code = serializers.CharField()
+
+    def validate(self, attrs):
+        phone_number = attrs.get('phone_number')
+        code = attrs.get('code')
+        normalized = normalize_phone_number(phone_number)
+        if not normalized:
+            raise serializers.ValidationError(
+                'Invalid phone number. Use the 9 digits after +255, e.g. 674303431.'
+            )
+        attrs['phone_number'] = normalized
+        attrs['code'] = str(code).strip()
+        return attrs
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
