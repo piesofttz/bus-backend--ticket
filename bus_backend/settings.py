@@ -8,6 +8,14 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env if present
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(BASE_DIR / '.env')
+except Exception:
+    pass
+
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-^qyj-)e6q^0n@h+h8%l2w&k0$t%+msm*3nry+v54fy!^waxxm#')
 
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
