@@ -106,39 +106,42 @@ def user_view(request):
 
 
 def _send_otp_sms(phone_number, code):
-    """Send OTP via configured SMS API. Fill settings/env later if needed."""
+    """Send OTP via configured SMS API."""
     sms_url = getattr(settings, 'SMS_API_URL', '') or ''
     sms_user = getattr(settings, 'SMS_USER', '') or ''
     sms_pwd = getattr(settings, 'SMS_PWD', '') or ''
     sms_sender = getattr(settings, 'SMS_SENDER', '') or ''
     sms_language = getattr(settings, 'SMS_LANGUAGE', 'English') or 'English'
 
-    # Prepare number for provider (use normalized +255XXXXXXXXX by default; adjust if provider expects different format)
-    number = phone_number
+    # Provider expects 255XXXXXXXXX (no +)
+    number = str(phone_number).strip().replace('+', '')
     msg = f'Your login OTP is {code}. Do not share it with anyone.'
 
-    payload = [{
-        'user': sms_user,
-        'pwd': sms_pwd,
-        'number': number,
-        'msg': msg,
-        'sender': sms_sender,
-        'language': sms_language,
-    }]
+    payload = [
+        {
+            "user": sms_user,
+            "pwd": sms_pwd,
+            "number": number,
+            "msg": msg,
+            "sender": sms_sender,
+            "language": sms_language,
+        }
+    ]
 
-    # If API URL not configured, log/skip sending but still allow flow for testing? Return False so we know it failed to send
     if not sms_url:
-        # TODO: SMS_API_URL not configured
         return False
 
     try:
-        # Try JSON POST
-        resp = requests.post(sms_url, json=payload, timeout=30)
+        resp = requests.post(
+            sms_url,
+            json=payload,
+            headers={'Content-Type': 'application/json'},
+            timeout=30,
+        )
         try:
             resp.raise_for_status()
         except Exception:
             pass
-        # Try to parse response; don't fail hard
         return resp.ok
     except Exception:
         return False
