@@ -138,12 +138,19 @@ def _send_otp_sms(phone_number, code):
             headers={'Content-Type': 'application/json'},
             timeout=30,
         )
+        print("Status Code")
+        print(resp.status_code)
+
+        print("\nStatus Txt")
+        print(resp.txt)
         try:
             resp.raise_for_status()
-        except Exception:
+        except Exception as e:
+            print(f"Exceptional one {e}")
             pass
         return resp.ok
-    except Exception:
+    except Exception as e:
+        print(f"Exceptional Two {e}")
         return False
 
 
