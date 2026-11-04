@@ -103,15 +103,16 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-# SMS / OTP settings (fill these values later)
-SMS_API_URL = os.environ.get('SMS_API_URL', '')  # e.g. https://domain.com/sendsms_api_json.aspx
-SMS_USER = os.environ.get('SMS_USER', '')  # profile id
-SMS_PWD = os.environ.get('SMS_PWD', '')  # password
-SMS_SENDER = os.environ.get('SMS_SENDER', '')  # sender id
-SMS_LANGUAGE = os.environ.get('SMS_LANGUAGE', 'English')  # English or Unicode
+# SMS / OTP settings
+SMS_API_URL = os.environ.get('SMS_API_URL', '')
+SMS_USER = os.environ.get('SMS_USER', '')
+SMS_PWD = os.environ.get('SMS_PWD', '')
+SMS_SENDER = os.environ.get('SMS_SENDER', '')
+SMS_LANGUAGE = os.environ.get('SMS_LANGUAGE', 'English')
 OTP_LENGTH = int(os.environ.get('OTP_LENGTH', '6'))
-OTP_EXPIRY_MINUTES = int(os.environ.get('OTP_EXPIRY_MINUTES', '5'))
-OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', '3'))
+OTP_EXPIRY_HOURS = int(os.environ.get('OTP_EXPIRY_HOURS', '12'))
+OTP_EXPIRY_MINUTES = int(os.environ.get('OTP_EXPIRY_MINUTES', str(OTP_EXPIRY_HOURS * 60)))
+OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', '5'))
 
 from datetime import timedelta  # noqa: E402
 

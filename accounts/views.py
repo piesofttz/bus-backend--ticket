@@ -156,13 +156,15 @@ def _send_otp_sms(phone_number, code):
 
 @extend_schema(
     summary='Request OTP (Phone Login)',
-    description='Request an OTP sent to the registered phone number. Enter phone number (9 digits after +255 or full number).',
+    description='Request an OTP for the registered phone number. If a valid OTP already exists (within 12 hours), the same OTP will be reused.',
     request=OTPRequestSerializer,
     responses={
         200: {'type': 'object', 'properties': {
             'message': {'type': 'string'},
             'phone_number': {'type': 'string'},
             'expires_in_minutes': {'type': 'integer'},
+            'expires_in_hours': {'type': 'integer'},
+            'reuse_existing': {'type': 'boolean'},
         }},
         400: {'type': 'object', 'properties': {'error': {'type': 'string'}}},
     },
@@ -176,12 +178,23 @@ def otp_request_view(request):
     phone_number = serializer.validated_data['phone_number']
     user = serializer.validated_data['user']
 
-    # Invalidate previous unused OTPs for this number
-    OTP.objects.filter(phone_number=phone_number, is_used=False).update(is_used=True)
+    now = timezone.now()
+    existing_otp = OTP.objects.filter(phone_number=phone_number).order_by('-created_at').first()
+    if existing_otp and existing_otp.expires_at > now:
+        remaining = existing_otp.expires_at - now
+        remaining_minutes = int(remaining.total_seconds() // 60)
+        return Response({
+            'message': 'Using existing OTP. This OTP remains valid for 12 hours.',
+            'phone_number': phone_number,
+            'expires_in_minutes': remaining_minutes,
+            'expires_in_hours': int(getattr(settings, 'OTP_EXPIRY_HOURS', 12)),
+            'reuse_existing': True,
+        }, status=status.HTTP_200_OK)
 
     otp_length = getattr(settings, 'OTP_LENGTH', 6)
     code = ''.join([str(random.randint(0, 9)) for _ in range(int(otp_length))])
-    expires_at = timezone.now() + timedelta(minutes=int(getattr(settings, 'OTP_EXPIRY_MINUTES', 5)))
+    expiry_hours = int(getattr(settings, 'OTP_EXPIRY_HOURS', 12))
+    expires_at = now + timedelta(hours=expiry_hours)
 
     otp = OTP.objects.create(phone_number=phone_number, code=code, expires_at=expires_at)
 
@@ -190,13 +203,15 @@ def otp_request_view(request):
     return Response({
         'message': 'OTP sent to your phone number.',
         'phone_number': phone_number,
-        'expires_in_minutes': int(getattr(settings, 'OTP_EXPIRY_MINUTES', 5)),
+        'expires_in_minutes': expiry_hours * 60,
+        'expires_in_hours': expiry_hours,
+        'reuse_existing': False,
     }, status=status.HTTP_200_OK)
 
 
 @extend_schema(
     summary='Verify OTP (Phone Login)',
-    description='Verify OTP and login. Returns JWT access + refresh tokens on success.',
+    description='Verify OTP and login. Returns JWT access + refresh tokens on success. Same OTP can be reused within 12 hours after logout.',
     request=OTPVerifySerializer,
     responses={
         200: {'type': 'object', 'properties': {
@@ -226,28 +241,22 @@ def otp_verify_view(request):
     if not user.is_active:
         return Response({'error': 'User account is disabled.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    otp = OTP.objects.filter(phone_number=phone_number, is_used=False).order_by('-created_at').first()
+    otp = OTP.objects.filter(phone_number=phone_number).order_by('-created_at').first()
     if not otp:
-        return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'No OTP found. Please request a new OTP.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if timezone.now() > otp.expires_at:
-        otp.is_used = True
-        otp.save(update_fields=['is_used'])
-        return Response({'error': 'OTP has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+    now = timezone.now()
+    if now > otp.expires_at:
+        return Response({'error': 'OTP has expired. Please request a new OTP.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    max_attempts = int(getattr(settings, 'OTP_MAX_ATTEMPTS', 3))
+    max_attempts = int(getattr(settings, 'OTP_MAX_ATTEMPTS', 5))
     if otp.attempts >= max_attempts:
-        otp.is_used = True
-        otp.save(update_fields=['is_used', 'attempts'])
-        return Response({'error': 'Too many failed attempts. Request a new OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Too many failed attempts. Please request a new OTP.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if otp.code != code:
         otp.attempts += 1
         otp.save(update_fields=['attempts'])
         return Response({'error': 'Invalid OTP.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    otp.is_used = True
-    otp.save(update_fields=['is_used'])
 
     login(request, user)
     if user.is_staff or user.is_superuser:
