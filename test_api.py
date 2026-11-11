@@ -1,63 +1,73 @@
+"""
+Quick API smoke test for bus_backend.
+
+Usage:
+  1. Start the server: python manage.py runserver
+  2. Run: python test_api.py
+
+Notes:
+  - Uses JWT auth (Authorization: Bearer <access_token>).
+  - Attempts login with TEST_PHONE; if not registered it will register.
+  - Verifies key public/authenticated endpoints including route detail by ID.
+"""
+
 import requests
 
-BASE = "http://localhost:8000/api/auth"
-session = requests.Session()
+BASE = "http://127.0.0.1:8000"
+AUTH = f"{BASE}/api/auth"
+
+# 9 digits after +255
+TEST_PHONE = "699000001"
 
 
-def test(name, resp):
-    print(f"\n{'='*50}")
-    print(f"  {name}")
-    print(f"  Status: {resp.status_code}")
+def _print(name, resp):
+    print(f"\n{'=' * 60}\n{name}\nStatus: {resp.status_code}")
     try:
-        print(f"  Response: {resp.json()}")
+        data = resp.json()
+        print("Response:", data)
+        return data
     except Exception:
-        print(f"  Response: [PDF binary - {len(resp.content)} bytes]")
-    print(f"{'='*50}")
-    return resp
+        print("Response: <non-json>", resp.text[:200])
+        return None
 
 
-# 1. Register
-test("1. REGISTER", session.post(f"{BASE}/register/", json={
-    "username": "testuser",
-    "password": "test1234",
-    "email": "test@mail.com",
-    "first_name": "John",
-    "last_name": "Doe",
-}))
+def main():
+    session = requests.Session()
 
-# 2. Login
-test("2. LOGIN", session.post(f"{BASE}/login/", json={
-    "username": "testuser",
-    "password": "test1234",
-}))
+    # Login or register
+    resp = session.post(f"{AUTH}/login/", json={"phone_number": TEST_PHONE})
+    if resp.status_code != 200:
+        _print("REGISTER (auto)", session.post(f"{AUTH}/register/", json={
+            "phone_number": TEST_PHONE,
+            "first_name": "Test",
+            "last_name": "User",
+            "email": "test@example.com",
+        }))
+        resp = session.post(f"{AUTH}/login/", json={"phone_number": TEST_PHONE})
 
-# 3. Get User
-test("3. GET USER", session.get(f"{BASE}/user/"))
+    login_data = _print("LOGIN", resp)
+    if not login_data or "access_token" not in login_data:
+        print("Login failed; cannot continue.")
+        return
 
-# 4. Book Ticket
-resp = test("4. BOOK TICKET", session.post(f"{BASE}/tickets/", json={
-    "full_name": "John Doe",
-    "phone_number": "0712345678",
-    "route": "dar_to_mwanza",
-    "seat_number": "12A",
-    "travel_date": "2026-08-25",
-}))
+    headers = {"Authorization": f"Bearer {login_data['access_token']}"}
 
-# 5. List Tickets
-test("5. LIST TICKETS", session.get(f"{BASE}/tickets/"))
+    _print("CURRENT USER", session.get(f"{AUTH}/user/", headers=headers))
 
-# 6. Get Ticket Detail
-test("6. TICKET DETAIL", session.get(f"{BASE}/tickets/1/"))
+    routes_data = _print("LIST ROUTES", session.get(f"{AUTH}/routes/", headers=headers))
+    route_id = None
+    if isinstance(routes_data, list) and routes_data:
+        route_id = routes_data[0].get("id")
 
-# 7. Download PDF Receipt
-pdf = test("7. PDF RECEIPT", session.get(f"{BASE}/tickets/1/receipt/"))
-if pdf.status_code == 200 and len(pdf.content) > 100:
-    with open("receipt.pdf", "wb") as f:
-        f.write(pdf.content)
-    print("  >> receipt.pdf saved!")
+    if route_id:
+        _print(f"ROUTE DETAIL (id={route_id})", session.get(f"{AUTH}/routes/{route_id}/", headers=headers))
+        _print(f"BUSES FOR ROUTE (route_id={route_id})", session.get(f"{AUTH}/routes/{route_id}/buses/", headers=headers))
 
-# 8. Delete Ticket
-test("8. DELETE TICKET", session.delete(f"{BASE}/tickets/1/"))
+    _print("ALL BUSES", session.get(f"{AUTH}/buses/", headers=headers))
+    _print("MY BOOKINGS", session.get(f"{AUTH}/bookings/", headers=headers))
 
-# 9. Logout
-test("9. LOGOUT", session.post(f"{BASE}/logout/"))
+    print("\nSmoke test completed.")
+
+
+if __name__ == "__main__":
+    main()

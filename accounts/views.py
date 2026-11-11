@@ -373,6 +373,27 @@ class RouteListView(APIView):
         return Response(serializer.data)
 
 
+class RouteDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Get Route by ID',
+        description='Get a single bus route by its ID.',
+        responses={200: RouteSerializer, 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
+        tags=['Routes'],
+    )
+    def get(self, request, route_id):
+        try:
+            route = Route.objects.get(pk=route_id)
+        except Route.DoesNotExist:
+            return Response(
+                {'error': 'Route not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = RouteSerializer(route)
+        return Response(serializer.data)
+
+
 class AllBusListView(APIView):
     permission_classes = [IsAuthenticated]
 
