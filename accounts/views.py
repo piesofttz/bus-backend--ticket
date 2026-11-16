@@ -438,7 +438,7 @@ class BusListView(APIView):
 
     @extend_schema(
         summary='Get Buses for Route',
-        description='Get all buses for a specific route by route ID. Returns an empty list if no buses are assigned to the route.',
+        description='Get all buses for a specific route by route ID. Returns a list of buses when available; if none are assigned, returns an object with route details and a message.',
         responses={200: BusSerializer(many=True), 404: {'type': 'object', 'properties': {'error': {'type': 'string'}}}},
         tags=['Buses'],
     )
@@ -452,6 +452,13 @@ class BusListView(APIView):
             )
         buses = Bus.objects.filter(route=route)
         serializer = BusSerializer(buses, many=True)
+        if not buses.exists():
+            return Response({
+                'route_id': route.id,
+                'route': str(route),
+                'buses': [],
+                'message': 'No buses are assigned to this route.',
+            }, status=status.HTTP_200_OK)
         return Response(serializer.data)
 
 
