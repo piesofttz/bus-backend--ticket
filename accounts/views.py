@@ -399,7 +399,7 @@ class AllBusListView(APIView):
 
     @extend_schema(
         summary='Get All Buses',
-        description='Get all available buses. Optional filters: route_id, search, origin, destination.',
+        description='Get all buses. Optional filters: route_id, search, origin, destination. Returns a list of buses when available; if none are found, returns an object with a message.',
         parameters=[
             OpenApiParameter(name='route_id', type=int, description='Filter by route ID', required=False),
             OpenApiParameter(name='search', type=str, description='Search by bus number or operator', required=False),
@@ -410,7 +410,7 @@ class AllBusListView(APIView):
         tags=['Buses'],
     )
     def get(self, request):
-        buses = Bus.objects.filter(is_active=True)
+        buses = Bus.objects.all()
         route_id = request.query_params.get('route_id')
         search = request.query_params.get('search', '').strip()
         origin = request.query_params.get('origin', '').strip()
@@ -430,6 +430,12 @@ class AllBusListView(APIView):
             buses = buses.filter(route__destination__icontains=destination)
 
         serializer = BusSerializer(buses, many=True)
+        if not buses.exists():
+            return Response({
+                'buses': [],
+                'count': 0,
+                'message': 'No buses found.',
+            }, status=status.HTTP_200_OK)
         return Response(serializer.data)
 
 
